@@ -1,3 +1,7 @@
+import org.gradle.kotlin.dsl.java
+import java.util.Date
+import java.text.SimpleDateFormat
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -5,35 +9,39 @@ plugins {
 
 android {
     namespace = "com.example.photocomparetool"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.yydaniel.photocomparetool"
         minSdk = 29
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1"
-
+        versionName = "0.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            optimization {
-                enable = false
-            }
+            isMinifyEnabled = true
+            isShrinkResources = true    // 删除未使用的资源
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.forEach { output ->
+            val buildDate = SimpleDateFormat("yyyyMMdd").format(Date())
+            output.outputFileName = "PhotoCompareTool_${android.defaultConfig.versionName}_${buildDate}_${variant.buildType}.apk"
+        }
     }
 }
 
@@ -48,7 +56,7 @@ dependencies {
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     // implementation(libs.androidx.room3.compiler.processing.testing)
-    implementation(libs.material3)
+    // implementation(libs.material3)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
