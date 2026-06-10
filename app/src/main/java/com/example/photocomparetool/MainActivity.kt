@@ -36,12 +36,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.exifinterface.media.ExifInterface
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
 import com.example.photocomparetool.activities.SettingsActivity
 import com.example.photocomparetool.repositories.SettingsRepository
 import com.example.photocomparetool.ui.theme.PhotoCompareToolTheme
+import com.example.photocomparetool.viewmodels.HomeViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -156,38 +158,157 @@ suspend fun readExifInfo(context: Context, uri: Uri): ExifDisplayInfo = withCont
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+//fun HomeScreen() {
+//    val context = LocalContext.current
+//    val settingsRepo = remember { SettingsRepository.getInstance(context) }
+//
+//    // 从 DataStore 实时读取设置
+//    val defaultModeName by settingsRepo.defaultCompareMode.collectAsState(initial = "SINGLE")
+//    val isLocked by settingsRepo.isLocked.collectAsState(initial = false)
+//    val zoomLimit by settingsRepo.zoomLimit.collectAsState(initial = 5.0f)
+//    val showExif by settingsRepo.showExif.collectAsState(initial = true)
+//    val showZoomRatio by settingsRepo.showZoomRatio.collectAsState(initial = true)
+//
+//    // 将读取到的模式转换为枚举
+//    val selectedMode = try {
+//        CompareMode.valueOf(defaultModeName)
+//    } catch (_: Exception) {
+//        CompareMode.SINGLE
+//    }
+//
+//    var menuExpanded by remember { mutableStateOf(false) }
+//
+//    // 照片 Uri 列表
+//    var selectedUris by remember { mutableStateOf(List<Uri?>(4) { null }) }
+//    val photoStates = remember { mutableStateListOf<PhotoTransformState>() }
+//    if (photoStates.isEmpty()) repeat(4) { photoStates.add(PhotoTransformState()) }
+//
+//    var currentPickerIndex by remember { mutableIntStateOf(0) }
+//
+//    val imagePicker = rememberLauncherForActivityResult(
+//        contract = ActivityResultContracts.PickVisualMedia()
+//    ) { uri ->
+//        uri?.let {
+//            selectedUris = selectedUris.toMutableList().also { it[currentPickerIndex] = uri }
+//        }
+//    }
+//
+//    val coroutineScope = rememberCoroutineScope()
+//
+//    Scaffold(
+//        topBar = {
+//            TopAppBar(
+//                title = { Text(stringResource(R.string.app_name)) },
+//                actions = {
+//                    // 锁定按钮：点击时更新 Compose 已收集的值（isLocked 自动刷新）
+//                    IconButton(onClick = {
+//                        coroutineScope.launch {
+//                            settingsRepo.setLocked(!isLocked)
+//                        }
+//                    }) {
+//                        Icon(
+//                            imageVector = if (isLocked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+//                            contentDescription = if (isLocked) "解锁" else "锁定"
+//                        )
+//                    }
+//                    Spacer(modifier = Modifier.width(4.dp))
+//                    Box {
+//                        IconButton(onClick = { menuExpanded = true }) {
+//                            Icon(selectedMode.icon, contentDescription = "切换比对模式")
+//                        }
+//                        DropdownMenu(
+//                            expanded = menuExpanded,
+//                            onDismissRequest = { menuExpanded = false }
+//                        ) {
+//                            CompareMode.entries.forEach { mode ->
+//                                DropdownMenuItem(
+//                                    text = { Text(mode.label) },
+//                                    onClick = {
+//                                        menuExpanded = false
+//                                        // 持久化选择的模式
+//                                        coroutineScope.launch {
+//                                            settingsRepo.setDefaultCompareMode(mode.name)
+//                                        }
+//                                        // 清空当前图片和缩放状态
+//                                        selectedUris = List(4) { null }
+//                                        photoStates.forEach { state ->
+//                                            state.scale = 1f
+//                                            state.offsetX = 0f
+//                                            state.offsetY = 0f
+//                                        }
+//                                    },
+//                                    leadingIcon = { Icon(mode.icon, null) },
+//                                    trailingIcon = {
+//                                        if (mode == selectedMode) {
+//                                            Icon(
+//                                                Icons.Filled.Check,
+//                                                contentDescription = "已选中",
+//                                                tint = MaterialTheme.colorScheme.primary
+//                                            )
+//                                        }
+//                                    }
+//                                )
+//                            }
+//                        }
+//                    }
+//                    Spacer(modifier = Modifier.width(4.dp))
+//                    IconButton(onClick = {
+//                        context.startActivity(Intent(context, SettingsActivity::class.java))
+//                    }) {
+//                        Icon(Icons.Filled.Settings, contentDescription = "设置")
+//                    }
+//                }
+//            )
+//        }
+//    ) { innerPadding ->
+//        CompareContent(
+//            mode = selectedMode,
+//            selectedUris = selectedUris,
+//            photoStates = photoStates,
+//            isLocked = isLocked,
+//            zoomLimit = zoomLimit,         // 传递缩放上限
+//            showExif = showExif,           // 传递 EXIF 显示开关
+//            showZoomRatio = showZoomRatio, // 传递缩放 显示开关
+//            onCardClick = { index ->
+//                currentPickerIndex = index
+//                imagePicker.launch(
+//                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+//                )
+//            },
+//            modifier = Modifier.padding(innerPadding)
+//        )
+//    }
+//}
 fun HomeScreen() {
     val context = LocalContext.current
     val settingsRepo = remember { SettingsRepository.getInstance(context) }
+    val viewModel: HomeViewModel = viewModel(
+        viewModelStoreOwner = LocalContext.current as ComponentActivity
+    )  // 自动与 Activity 生命周期绑定
 
-    // 从 DataStore 实时读取设置
+    // 从 DataStore 读取全局设置（优先使用持久化的值覆盖 ViewModel 的默认值）
     val defaultModeName by settingsRepo.defaultCompareMode.collectAsState(initial = "SINGLE")
-    val isLocked by settingsRepo.isLocked.collectAsState(initial = false)
+    val isLockedPersisted by settingsRepo.isLocked.collectAsState(initial = false)
     val zoomLimit by settingsRepo.zoomLimit.collectAsState(initial = 5.0f)
     val showExif by settingsRepo.showExif.collectAsState(initial = true)
     val showZoomRatio by settingsRepo.showZoomRatio.collectAsState(initial = true)
 
-    // 将读取到的模式转换为枚举
-    val selectedMode = try {
-        CompareMode.valueOf(defaultModeName)
-    } catch (_: Exception) {
-        CompareMode.SINGLE
+    // 用 DataStore 的值同步 ViewModel 中的 selectedMode 和 isLocked
+    LaunchedEffect(defaultModeName) {
+        viewModel.selectedMode = try { CompareMode.valueOf(defaultModeName) } catch (_: Exception) { CompareMode.SINGLE }
+    }
+    LaunchedEffect(isLockedPersisted) {
+        viewModel.isLocked = isLockedPersisted
     }
 
     var menuExpanded by remember { mutableStateOf(false) }
-
-    // 照片 Uri 列表
-    var selectedUris by remember { mutableStateOf(List<Uri?>(4) { null }) }
-    val photoStates = remember { mutableStateListOf<PhotoTransformState>() }
-    if (photoStates.isEmpty()) repeat(4) { photoStates.add(PhotoTransformState()) }
-
     var currentPickerIndex by remember { mutableIntStateOf(0) }
 
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         uri?.let {
-            selectedUris = selectedUris.toMutableList().also { it[currentPickerIndex] = uri }
+            viewModel.selectedUris[currentPickerIndex] = uri
         }
     }
 
@@ -198,21 +319,21 @@ fun HomeScreen() {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
-                    // 锁定按钮：点击时更新 Compose 已收集的值（isLocked 自动刷新）
+                    // 锁定按钮
                     IconButton(onClick = {
                         coroutineScope.launch {
-                            settingsRepo.setLocked(!isLocked)
+                            settingsRepo.setLocked(!viewModel.isLocked)
                         }
                     }) {
                         Icon(
-                            imageVector = if (isLocked) Icons.Filled.Lock else Icons.Filled.LockOpen,
-                            contentDescription = if (isLocked) "解锁" else "锁定"
+                            imageVector = if (viewModel.isLocked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                            contentDescription = if (viewModel.isLocked) "解锁" else "锁定"
                         )
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {
-                            Icon(selectedMode.icon, contentDescription = "切换比对模式")
+                            Icon(viewModel.selectedMode.icon, contentDescription = "切换比对模式")
                         }
                         DropdownMenu(
                             expanded = menuExpanded,
@@ -223,13 +344,11 @@ fun HomeScreen() {
                                     text = { Text(mode.label) },
                                     onClick = {
                                         menuExpanded = false
-                                        // 持久化选择的模式
-                                        coroutineScope.launch {
-                                            settingsRepo.setDefaultCompareMode(mode.name)
-                                        }
-                                        // 清空当前图片和缩放状态
-                                        selectedUris = List(4) { null }
-                                        photoStates.forEach { state ->
+                                        viewModel.selectedMode = mode
+                                        coroutineScope.launch { settingsRepo.setDefaultCompareMode(mode.name) }
+                                        // 清空图片和状态
+                                        for (i in 0..3) viewModel.selectedUris[i] = null
+                                        viewModel.photoStates.forEach { state ->
                                             state.scale = 1f
                                             state.offsetX = 0f
                                             state.offsetY = 0f
@@ -237,7 +356,7 @@ fun HomeScreen() {
                                     },
                                     leadingIcon = { Icon(mode.icon, null) },
                                     trailingIcon = {
-                                        if (mode == selectedMode) {
+                                        if (mode == viewModel.selectedMode) {
                                             Icon(
                                                 Icons.Filled.Check,
                                                 contentDescription = "已选中",
@@ -250,9 +369,7 @@ fun HomeScreen() {
                         }
                     }
                     Spacer(modifier = Modifier.width(4.dp))
-                    IconButton(onClick = {
-                        context.startActivity(Intent(context, SettingsActivity::class.java))
-                    }) {
+                    IconButton(onClick = { context.startActivity(Intent(context, SettingsActivity::class.java)) }) {
                         Icon(Icons.Filled.Settings, contentDescription = "设置")
                     }
                 }
@@ -260,18 +377,16 @@ fun HomeScreen() {
         }
     ) { innerPadding ->
         CompareContent(
-            mode = selectedMode,
-            selectedUris = selectedUris,
-            photoStates = photoStates,
-            isLocked = isLocked,
-            zoomLimit = zoomLimit,         // 传递缩放上限
-            showExif = showExif,           // 传递 EXIF 显示开关
-            showZoomRatio = showZoomRatio, // 传递缩放 显示开关
+            mode = viewModel.selectedMode,
+            selectedUris = viewModel.selectedUris,
+            photoStates = viewModel.photoStates,
+            isLocked = viewModel.isLocked,
+            zoomLimit = zoomLimit,
+            showExif = showExif,
+            showZoomRatio = showZoomRatio,
             onCardClick = { index ->
                 currentPickerIndex = index
-                imagePicker.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                )
+                imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             },
             modifier = Modifier.padding(innerPadding)
         )
