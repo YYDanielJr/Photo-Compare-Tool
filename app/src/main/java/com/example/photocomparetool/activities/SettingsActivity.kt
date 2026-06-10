@@ -4,26 +4,29 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
-import androidx.compose.material3.TopAppBar
-import androidx.compose.ui.res.stringResource
-import com.example.photocomparetool.R
-import com.example.photocomparetool.ui.theme.PhotoCompareToolTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,9 +39,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.photocomparetool.CompareMode
+import com.example.photocomparetool.R
 import com.example.photocomparetool.repositories.SettingsRepository
+import com.example.photocomparetool.ui.theme.PhotoCompareToolTheme
 import kotlinx.coroutines.launch
 
 class SettingsActivity : ComponentActivity() {
@@ -57,18 +63,19 @@ class SettingsActivity : ComponentActivity() {
             val isLocked by settingsRepo.isLocked.collectAsState(initial = false)
             val zoomLimit by settingsRepo.zoomLimit.collectAsState(initial = 5.0f)
             val showExif by settingsRepo.showExif.collectAsState(initial = true)
+            val showZoomRatio by settingsRepo.showZoomRatio.collectAsState(initial = true)
 
             PhotoCompareToolTheme {
                 Scaffold(
                     topBar = {
                         LargeTopAppBar(
-                            title = { Text(stringResource(R.string.setting_title) )}
+                            title = { Text(stringResource(R.string.setting_title)) }
                         )
                     }
                 ) { innerPadding ->
                     LazyColumn(
                         modifier = Modifier.padding(innerPadding),
-                        contentPadding = PaddingValues(vertical = 8.dp)
+                        contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
                         // 分组标题：常规
                         item {
@@ -76,7 +83,7 @@ class SettingsActivity : ComponentActivity() {
                                 "常规",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 4.dp)
                             )
                         }
 
@@ -116,7 +123,7 @@ class SettingsActivity : ComponentActivity() {
                                 "显示",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 4.dp)
                             )
                         }
 
@@ -134,23 +141,37 @@ class SettingsActivity : ComponentActivity() {
                             )
                         }
 
+                        // 4. 显示缩放比
+                        item {
+                            SettingsSwitchItem(
+                                title = "显示放大比率",
+                                subtitle = "（目前不可用）在照片左下角显示相对于屏幕宽度的百分比",
+                                checked = showZoomRatio,
+                                onCheckedChange = { checked ->
+                                    coroutineScope.launch {
+                                        settingsRepo.setShowZoomRatio(checked)
+                                    }
+                                }
+                            )
+                        }
+
                         // 分组标题：缩放
                         item {
                             Text(
                                 "缩放",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 4.dp)
                             )
                         }
 
-                        // 4. 最大缩放倍数
+                        // 5. 最大缩放倍数
                         item {
                             SettingsSliderItem(
                                 title = "最大缩放倍数",
                                 value = zoomLimit,
-                                valueRange = 2.0f..10.0f,
-                                steps = 7,                     // 2,3,4,5,6,7,8,9,10
+                                valueRange = 2.0f..20.0f,
+                                steps = 17,                     // 2,3,4,5,6,7,8,9,10
                                 onValueChange = { newLimit ->
                                     coroutineScope.launch {
                                         settingsRepo.setZoomLimit(newLimit)
@@ -166,7 +187,7 @@ class SettingsActivity : ComponentActivity() {
     }
 }
 
-// ---------------------- 可复用设置项组件 ----------------------
+// ---------------------- 可复用设置项组件（优化后）---------------------
 
 @Composable
 fun SettingsSwitchItem(
@@ -178,6 +199,7 @@ fun SettingsSwitchItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) } // 整行点击可切换
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -188,6 +210,7 @@ fun SettingsSwitchItem(
                 Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        // Switch 保留，其自身的 onCheckedChange 也会触发，但由于整行已有点击，不再重复调用
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
@@ -204,14 +227,22 @@ fun SettingsDropdownItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { expanded = true } // 点击整行展开菜单
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = title, style = MaterialTheme.typography.bodyLarge)
         Box {
-            TextButton(onClick = { expanded = true }) {
+            TextButton(onClick = { expanded = true }) { // 仍然保留按钮，但点击整行也会展开
                 Text(selectedOption)
+                Spacer(modifier = Modifier.width(2.dp))
+                Icon(
+                    imageVector = Icons.Filled.ArrowDropDown,
+                    contentDescription = "展开",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
             }
             DropdownMenu(
                 expanded = expanded,

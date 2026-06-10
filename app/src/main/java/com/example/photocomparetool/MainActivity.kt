@@ -2,6 +2,7 @@ package com.example.photocomparetool
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -59,7 +61,7 @@ class MainActivity : ComponentActivity() {
 // 比对模式枚举
 enum class CompareMode(val icon: ImageVector, val label: String) {
     SINGLE(Icons.Filled.Photo, "单张"),
-    TWO(Icons.Filled.ViewAgenda, "两张"),
+    TWO(Icons.Filled.Splitscreen, "两张"),
     FOUR(Icons.Filled.GridView, "四张")
 }
 
@@ -77,6 +79,7 @@ class PhotoTransformState(
 // EXIF 显示信息
 data class ExifDisplayInfo(
     val fileName: String = "未知",
+    val resolution: String = "",
     val device: String = "未知",
     val aperture: String = "未知",
     val shutter: String = "未知",
@@ -137,8 +140,12 @@ suspend fun readExifInfo(context: Context, uri: Uri): ExifDisplayInfo = withCont
         val focalLength35mmValue = exif.getAttributeInt(ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM, -1)
         val focalLength35mm = if (focalLength35mmValue > 0) "${focalLength35mmValue}mm" else null
 
+        val width = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, -1)
+        val height = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, -1)
+        val resolution = if (width > 0 && height > 0) "${width}x${height}" else ""
+
         ExifDisplayInfo(
-            fileName, device, aperture, shutter, iso,
+            fileName, resolution, device, aperture, shutter, iso,
             focalLength, focalLength35mm
         )
     } catch (e: Exception) {
@@ -158,6 +165,7 @@ fun HomeScreen() {
     val isLocked by settingsRepo.isLocked.collectAsState(initial = false)
     val zoomLimit by settingsRepo.zoomLimit.collectAsState(initial = 5.0f)
     val showExif by settingsRepo.showExif.collectAsState(initial = true)
+    val showZoomRatio by settingsRepo.showZoomRatio.collectAsState(initial = true)
 
     // 将读取到的模式转换为枚举
     val selectedMode = try {
@@ -258,6 +266,7 @@ fun HomeScreen() {
             isLocked = isLocked,
             zoomLimit = zoomLimit,         // 传递缩放上限
             showExif = showExif,           // 传递 EXIF 显示开关
+            showZoomRatio = showZoomRatio, // 传递缩放 显示开关
             onCardClick = { index ->
                 currentPickerIndex = index
                 imagePicker.launch(
@@ -277,6 +286,7 @@ fun CompareContent(
     isLocked: Boolean,
     zoomLimit: Float,
     showExif: Boolean,
+    showZoomRatio: Boolean,    // 传递缩放 显示开关
     onCardClick: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -306,31 +316,90 @@ fun CompareContent(
                     transformState = photoStates[0],
                     onGestureDelta = createGestureHandler(0),
                     modifier = Modifier.fillMaxSize(),
-                    showExif = showExif
+                    showExif = showExif,
+                    showZoomRatio = showZoomRatio, // 传递缩放 显示开关
                 )
             }
         }
+//        CompareMode.TWO -> {
+//            Column(
+//                modifier = modifier.fillMaxSize().padding(16.dp),
+//                verticalArrangement = Arrangement.spacedBy(8.dp)
+//            ) {
+//                ZoomablePhotoContainer(
+//                    uri = selectedUris[0],
+//                    onClick = { onCardClick(0) },
+//                    transformState = photoStates[0],
+//                    onGestureDelta = createGestureHandler(0),
+//                    modifier = Modifier.weight(1f).fillMaxWidth(),
+//                    showExif = showExif,
+//                    showZoomRatio = showZoomRatio, // 传递缩放 显示开关
+//                )
+//                ZoomablePhotoContainer(
+//                    uri = selectedUris[1],
+//                    onClick = { onCardClick(1) },
+//                    transformState = photoStates[1],
+//                    onGestureDelta = createGestureHandler(1),
+//                    modifier = Modifier.weight(1f).fillMaxWidth(),
+//                    showExif = showExif,
+//                    showZoomRatio = showZoomRatio, // 传递缩放 显示开关
+//                )
+//            }
+//        }
         CompareMode.TWO -> {
-            Column(
-                modifier = modifier.fillMaxSize().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ZoomablePhotoContainer(
-                    uri = selectedUris[0],
-                    onClick = { onCardClick(0) },
-                    transformState = photoStates[0],
-                    onGestureDelta = createGestureHandler(0),
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    showExif = showExif
-                )
-                ZoomablePhotoContainer(
-                    uri = selectedUris[1],
-                    onClick = { onCardClick(1) },
-                    transformState = photoStates[1],
-                    onGestureDelta = createGestureHandler(1),
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    showExif = showExif
-                )
+            val configuration = LocalConfiguration.current
+            val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+            if (isLandscape) {
+                // 横屏：左右布局
+                Row(
+                    modifier = modifier.fillMaxSize().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ZoomablePhotoContainer(
+                        uri = selectedUris[0],
+                        onClick = { onCardClick(0) },
+                        transformState = photoStates[0],
+                        onGestureDelta = createGestureHandler(0),
+                        showExif = showExif,
+                        showZoomRatio = showZoomRatio,
+                        modifier = Modifier.weight(1f).fillMaxHeight()
+                    )
+                    ZoomablePhotoContainer(
+                        uri = selectedUris[1],
+                        onClick = { onCardClick(1) },
+                        transformState = photoStates[1],
+                        onGestureDelta = createGestureHandler(1),
+                        showExif = showExif,
+                        showZoomRatio = showZoomRatio,
+                        modifier = Modifier.weight(1f).fillMaxHeight()
+                    )
+                }
+            } else {
+                // 竖屏：上下布局（保持原样）
+                Column(
+                    modifier = modifier.fillMaxSize().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ZoomablePhotoContainer(
+                        uri = selectedUris[0],
+                        onClick = { onCardClick(0) },
+                        transformState = photoStates[0],
+                        onGestureDelta = createGestureHandler(0),
+                        showExif = showExif,
+                        showZoomRatio = showZoomRatio,
+                        modifier = Modifier.weight(1f).fillMaxWidth()
+                    )
+                    ZoomablePhotoContainer(
+                        uri = selectedUris[1],
+                        onClick = { onCardClick(1) },
+                        transformState = photoStates[1],
+                        onGestureDelta = createGestureHandler(1),
+                        showExif = showExif,
+                        showZoomRatio = showZoomRatio,
+                        modifier = Modifier.weight(1f).fillMaxWidth()
+                    )
+                }
             }
         }
         CompareMode.FOUR -> {
@@ -348,7 +417,8 @@ fun CompareContent(
                         transformState = photoStates[0],
                         onGestureDelta = createGestureHandler(0),
                         modifier = Modifier.weight(1f).fillMaxHeight(),
-                        showExif = showExif
+                        showExif = showExif,
+                        showZoomRatio = showZoomRatio, // 传递缩放 显示开关
                     )
                     ZoomablePhotoContainer(
                         uri = selectedUris[1],
@@ -356,7 +426,8 @@ fun CompareContent(
                         transformState = photoStates[1],
                         onGestureDelta = createGestureHandler(1),
                         modifier = Modifier.weight(1f).fillMaxHeight(),
-                        showExif = showExif
+                        showExif = showExif,
+                        showZoomRatio = showZoomRatio, // 传递缩放 显示开关
                     )
                 }
                 Row(
@@ -369,7 +440,8 @@ fun CompareContent(
                         transformState = photoStates[2],
                         onGestureDelta = createGestureHandler(2),
                         modifier = Modifier.weight(1f).fillMaxHeight(),
-                        showExif = showExif
+                        showExif = showExif,
+                        showZoomRatio = showZoomRatio, // 传递缩放 显示开关
                     )
                     ZoomablePhotoContainer(
                         uri = selectedUris[3],
@@ -377,7 +449,8 @@ fun CompareContent(
                         transformState = photoStates[3],
                         onGestureDelta = createGestureHandler(3),
                         modifier = Modifier.weight(1f).fillMaxHeight(),
-                        showExif = showExif
+                        showExif = showExif,
+                        showZoomRatio = showZoomRatio, // 传递缩放 显示开关
                     )
                 }
             }
@@ -392,6 +465,7 @@ fun ZoomablePhotoContainer(
     transformState: PhotoTransformState,
     onGestureDelta: (Float, Float, Float) -> Unit,
     showExif: Boolean = true,
+    showZoomRatio: Boolean = true, // 传递缩放 显示开关
     modifier: Modifier = Modifier
 ) {
     val currentOnGestureDelta by rememberUpdatedState(onGestureDelta)
@@ -468,7 +542,12 @@ fun ZoomablePhotoContainer(
                 ) {
                     Column {
                         Text(
-                            text = exifInfo!!.fileName,
+                            text = buildString {
+                                append(exifInfo!!.fileName)
+                                if (exifInfo!!.resolution.isNotEmpty()) {
+                                    append(" (${exifInfo!!.resolution})")
+                                }
+                            },
                             style = exifTextStyle
                         )
                         Text(
@@ -489,6 +568,24 @@ fun ZoomablePhotoContainer(
                     }
                 }
             }
+//            // 左下角放大比率显示（在 EXIF 层之后，同一父 Box 内）
+//            if (showZoomRatio) {
+//                val zoomPercent = (transformState.scale * 100).toInt()
+//                Box(
+//                    modifier = Modifier
+//                        .align(Alignment.BottomStart)
+//                        .padding(8.dp)
+//                        .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+//                        .padding(horizontal = 8.dp, vertical = 4.dp)
+//                ) {
+//                    Text(
+//                        text = "${zoomPercent}%",
+//                        color = Color.White,
+//                        fontSize = 12.sp,
+//                        fontWeight = FontWeight.Medium
+//                    )
+//                }
+//            }
         }
     }
 }

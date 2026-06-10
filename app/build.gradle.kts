@@ -1,3 +1,4 @@
+import com.android.build.api.variant.FilterConfiguration
 import org.gradle.kotlin.dsl.java
 import java.util.Date
 import java.text.SimpleDateFormat
@@ -15,7 +16,7 @@ android {
         applicationId = "com.yydaniel.photocomparetool"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
+        versionCode = 20260610
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -34,13 +35,35 @@ android {
     buildFeatures {
         compose = true
     }
+    splits {
+        // Configures multiple APKs based on ABI.
+        abi {
+            // Enables building multiple APKs per ABI.
+            isEnable = true
+            // By default all ABIs are included, so use reset() and include to specify that you only
+            // want APKs for x86 and x86_64.
+            // Resets the list of ABIs for Gradle to create APKs for to none.
+            reset()
+            // Specifies a list of ABIs for Gradle to create APKs for.
+            include("x86", "x86_64", "arm", "armeabi-v7a", "arm64-v8a")
+
+            // Specifies that you don't want to also generate a universal APK that includes all ABIs.
+            isUniversalApk = true
+        }
+    }
 }
 
 androidComponents {
     onVariants(selector().all()) { variant ->
         variant.outputs.forEach { output ->
             val buildDate = SimpleDateFormat("yyyyMMdd").format(Date())
-            output.outputFileName = "PhotoCompareTool_${android.defaultConfig.versionName}_${buildDate}_${variant.buildType}.apk"
+            val buildType = variant.buildType
+            // 修正：使用枚举比较
+            val abi = output.filters
+                .firstOrNull { it.filterType == FilterConfiguration.FilterType.ABI }
+                ?.identifier
+                ?: "universal"
+            output.outputFileName = "PhotoCompareTool_${android.defaultConfig.versionName}_${buildDate}_${buildType}_${abi}.apk"
         }
     }
 }

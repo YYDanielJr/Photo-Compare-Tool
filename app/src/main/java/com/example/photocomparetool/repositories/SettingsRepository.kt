@@ -33,6 +33,7 @@ class SettingsRepository private constructor(private val dataStore: DataStore<Pr
         val IS_LOCKED = booleanPreferencesKey("is_locked")
         val ZOOM_LIMIT = floatPreferencesKey("zoom_limit")           // 默认 3.0f 或 5.0f
         val SHOW_EXIF = booleanPreferencesKey("show_exif")           // 是否显示 EXIF 信息
+        val SHOW_ZOOM_RATIO = booleanPreferencesKey("show_zoom_ratio")
     }
 
     // 公开只读 Flow 给 Compose 收集
@@ -50,6 +51,9 @@ class SettingsRepository private constructor(private val dataStore: DataStore<Pr
 
     val showExif: Flow<Boolean> = dataStore.data.map { preferences ->
         preferences[PreferencesKeys.SHOW_EXIF] ?: true
+    }
+    val showZoomRatio: Flow<Boolean> = dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.SHOW_ZOOM_RATIO] ?: true
     }
 
     // 更新方法（挂起函数）
@@ -74,6 +78,11 @@ class SettingsRepository private constructor(private val dataStore: DataStore<Pr
     suspend fun setShowExif(show: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.SHOW_EXIF] = show
+        }
+    }
+    suspend fun setShowZoomRatio(show: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SHOW_ZOOM_RATIO] = show
         }
     }
 }
