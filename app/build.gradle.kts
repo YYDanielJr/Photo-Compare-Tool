@@ -16,8 +16,8 @@ android {
         applicationId = "com.yydaniel.photocomparetool"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20260610
-        versionName = "1.0.0"
+        versionCode = 20260611
+        versionName = "1.0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -45,7 +45,7 @@ android {
             // Resets the list of ABIs for Gradle to create APKs for to none.
             reset()
             // Specifies a list of ABIs for Gradle to create APKs for.
-            include("x86", "x86_64", "arm", "armeabi-v7a", "arm64-v8a")
+            include("x86", "x86_64", "armeabi-v7a", "arm64-v8a")
 
             // Specifies that you don't want to also generate a universal APK that includes all ABIs.
             isUniversalApk = true
