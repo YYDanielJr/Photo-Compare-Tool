@@ -12,47 +12,8 @@
       "filters": [],
       "attributes": [],
       "versionCode": 20260611,
-      "versionName": "1.0.1",
-      "outputFile": "PhotoCompareTool_1.0.1_20260611_release_universal.apk"
-    },
-    {
-      "type": "ONE_OF_MANY",
-      "filters": [
-        {
-          "filterType": "ABI",
-          "value": "x86_64"
-        }
-      ],
-      "attributes": [],
-      "versionCode": 20260611,
-      "versionName": "1.0.1",
-      "outputFile": "PhotoCompareTool_1.0.1_20260611_release_x86_64.apk"
-    },
-    {
-      "type": "ONE_OF_MANY",
-      "filters": [
-        {
-          "filterType": "ABI",
-          "value": "armeabi-v7a"
-        }
-      ],
-      "attributes": [],
-      "versionCode": 20260611,
-      "versionName": "1.0.1",
-      "outputFile": "PhotoCompareTool_1.0.1_20260611_release_armeabi-v7a.apk"
-    },
-    {
-      "type": "ONE_OF_MANY",
-      "filters": [
-        {
-          "filterType": "ABI",
-          "value": "arm64-v8a"
-        }
-      ],
-      "attributes": [],
-      "versionCode": 20260611,
-      "versionName": "1.0.1",
-      "outputFile": "PhotoCompareTool_1.0.1_20260611_release_arm64-v8a.apk"
+      "versionName": "1.0.2",
+      "outputFile": "PhotoCompareTool_1.0.2_20260611_release_universal.apk"
     },
     {
       "type": "ONE_OF_MANY",
@@ -64,8 +25,47 @@
       ],
       "attributes": [],
       "versionCode": 20260611,
-      "versionName": "1.0.1",
-      "outputFile": "PhotoCompareTool_1.0.1_20260611_release_x86.apk"
+      "versionName": "1.0.2",
+      "outputFile": "PhotoCompareTool_1.0.2_20260611_release_x86.apk"
+    },
+    {
+      "type": "ONE_OF_MANY",
+      "filters": [
+        {
+          "filterType": "ABI",
+          "value": "armeabi-v7a"
+        }
+      ],
+      "attributes": [],
+      "versionCode": 20260611,
+      "versionName": "1.0.2",
+      "outputFile": "PhotoCompareTool_1.0.2_20260611_release_armeabi-v7a.apk"
+    },
+    {
+      "type": "ONE_OF_MANY",
+      "filters": [
+        {
+          "filterType": "ABI",
+          "value": "x86_64"
+        }
+      ],
+      "attributes": [],
+      "versionCode": 20260611,
+      "versionName": "1.0.2",
+      "outputFile": "PhotoCompareTool_1.0.2_20260611_release_x86_64.apk"
+    },
+    {
+      "type": "ONE_OF_MANY",
+      "filters": [
+        {
+          "filterType": "ABI",
+          "value": "arm64-v8a"
+        }
+      ],
+      "attributes": [],
+      "versionCode": 20260611,
+      "versionName": "1.0.2",
+      "outputFile": "PhotoCompareTool_1.0.2_20260611_release_arm64-v8a.apk"
     }
   ],
   "elementType": "File",
@@ -74,22 +74,22 @@
       "minApi": 28,
       "maxApi": 30,
       "baselineProfiles": [
-        "baselineProfiles/1/PhotoCompareTool_1.0.1_20260611_release_universal.dm",
-        "baselineProfiles/1/PhotoCompareTool_1.0.1_20260611_release_x86_64.dm",
-        "baselineProfiles/1/PhotoCompareTool_1.0.1_20260611_release_armeabi-v7a.dm",
-        "baselineProfiles/1/PhotoCompareTool_1.0.1_20260611_release_arm64-v8a.dm",
-        "baselineProfiles/1/PhotoCompareTool_1.0.1_20260611_release_x86.dm"
+        "baselineProfiles/1/PhotoCompareTool_1.0.2_20260611_release_universal.dm",
+        "baselineProfiles/1/PhotoCompareTool_1.0.2_20260611_release_x86.dm",
+        "baselineProfiles/1/PhotoCompareTool_1.0.2_20260611_release_armeabi-v7a.dm",
+        "baselineProfiles/1/PhotoCompareTool_1.0.2_20260611_release_x86_64.dm",
+        "baselineProfiles/1/PhotoCompareTool_1.0.2_20260611_release_arm64-v8a.dm"
       ]
     },
     {
       "minApi": 31,
       "maxApi": 2147483647,
       "baselineProfiles": [
-        "baselineProfiles/0/PhotoCompareTool_1.0.1_20260611_release_universal.dm",
-        "baselineProfiles/0/PhotoCompareTool_1.0.1_20260611_release_x86_64.dm",
-        "baselineProfiles/0/PhotoCompareTool_1.0.1_20260611_release_armeabi-v7a.dm",
-        "baselineProfiles/0/PhotoCompareTool_1.0.1_20260611_release_arm64-v8a.dm",
-        "baselineProfiles/0/PhotoCompareTool_1.0.1_20260611_release_x86.dm"
+        "baselineProfiles/0/PhotoCompareTool_1.0.2_20260611_release_universal.dm",
+        "baselineProfiles/0/PhotoCompareTool_1.0.2_20260611_release_x86.dm",
+        "baselineProfiles/0/PhotoCompareTool_1.0.2_20260611_release_armeabi-v7a.dm",
+        "baselineProfiles/0/PhotoCompareTool_1.0.2_20260611_release_x86_64.dm",
+        "baselineProfiles/0/PhotoCompareTool_1.0.2_20260611_release_arm64-v8a.dm"
       ]
     }
   ],
