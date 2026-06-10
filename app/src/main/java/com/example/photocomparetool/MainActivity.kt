@@ -1,6 +1,7 @@
 package com.example.photocomparetool
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -36,8 +37,11 @@ import androidx.exifinterface.media.ExifInterface
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
+import com.example.photocomparetool.activities.SettingsActivity
+import com.example.photocomparetool.repositories.SettingsRepository
 import com.example.photocomparetool.ui.theme.PhotoCompareToolTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
@@ -146,10 +150,25 @@ suspend fun readExifInfo(context: Context, uri: Uri): ExifDisplayInfo = withCont
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
-    var selectedMode by remember { mutableStateOf(CompareMode.SINGLE) }
-    var menuExpanded by remember { mutableStateOf(false) }
-    var isLocked by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val settingsRepo = remember { SettingsRepository.getInstance(context) }
 
+    // 从 DataStore 实时读取设置
+    val defaultModeName by settingsRepo.defaultCompareMode.collectAsState(initial = "SINGLE")
+    val isLocked by settingsRepo.isLocked.collectAsState(initial = false)
+    val zoomLimit by settingsRepo.zoomLimit.collectAsState(initial = 5.0f)
+    val showExif by settingsRepo.showExif.collectAsState(initial = true)
+
+    // 将读取到的模式转换为枚举
+    val selectedMode = try {
+        CompareMode.valueOf(defaultModeName)
+    } catch (_: Exception) {
+        CompareMode.SINGLE
+    }
+
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    // 照片 Uri 列表
     var selectedUris by remember { mutableStateOf(List<Uri?>(4) { null }) }
     val photoStates = remember { mutableStateListOf<PhotoTransformState>() }
     if (photoStates.isEmpty()) repeat(4) { photoStates.add(PhotoTransformState()) }
@@ -164,12 +183,19 @@ fun HomeScreen() {
         }
     }
 
+    val coroutineScope = rememberCoroutineScope()
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
-                    IconButton(onClick = { isLocked = !isLocked }) {
+                    // 锁定按钮：点击时更新 Compose 已收集的值（isLocked 自动刷新）
+                    IconButton(onClick = {
+                        coroutineScope.launch {
+                            settingsRepo.setLocked(!isLocked)
+                        }
+                    }) {
                         Icon(
                             imageVector = if (isLocked) Icons.Filled.Lock else Icons.Filled.LockOpen,
                             contentDescription = if (isLocked) "解锁" else "锁定"
@@ -188,8 +214,12 @@ fun HomeScreen() {
                                 DropdownMenuItem(
                                     text = { Text(mode.label) },
                                     onClick = {
-                                        selectedMode = mode
                                         menuExpanded = false
+                                        // 持久化选择的模式
+                                        coroutineScope.launch {
+                                            settingsRepo.setDefaultCompareMode(mode.name)
+                                        }
+                                        // 清空当前图片和缩放状态
                                         selectedUris = List(4) { null }
                                         photoStates.forEach { state ->
                                             state.scale = 1f
@@ -212,7 +242,9 @@ fun HomeScreen() {
                         }
                     }
                     Spacer(modifier = Modifier.width(4.dp))
-                    IconButton(onClick = { /* 设置 */ }) {
+                    IconButton(onClick = {
+                        context.startActivity(Intent(context, SettingsActivity::class.java))
+                    }) {
                         Icon(Icons.Filled.Settings, contentDescription = "设置")
                     }
                 }
@@ -224,6 +256,8 @@ fun HomeScreen() {
             selectedUris = selectedUris,
             photoStates = photoStates,
             isLocked = isLocked,
+            zoomLimit = zoomLimit,         // 传递缩放上限
+            showExif = showExif,           // 传递 EXIF 显示开关
             onCardClick = { index ->
                 currentPickerIndex = index
                 imagePicker.launch(
@@ -241,6 +275,8 @@ fun CompareContent(
     selectedUris: List<Uri?>,
     photoStates: List<PhotoTransformState>,
     isLocked: Boolean,
+    zoomLimit: Float,
+    showExif: Boolean,
     onCardClick: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -248,13 +284,13 @@ fun CompareContent(
         { zoomDelta, panX, panY ->
             if (isLocked) {
                 photoStates.forEach { state ->
-                    state.scale = (state.scale * zoomDelta).coerceIn(1f, 10f) // 改变缩放比例
+                    state.scale = (state.scale * zoomDelta).coerceIn(1f, zoomLimit) // 使用传入的 zoomLimit
                     state.offsetX += panX
                     state.offsetY += panY
                 }
             } else {
                 val state = photoStates[index]
-                state.scale = (state.scale * zoomDelta).coerceIn(1f, 10f) // 改变缩放比例
+                state.scale = (state.scale * zoomDelta).coerceIn(1f, zoomLimit)     // 使用传入的 zoomLimit
                 state.offsetX += panX
                 state.offsetY += panY
             }
@@ -269,7 +305,8 @@ fun CompareContent(
                     onClick = { onCardClick(0) },
                     transformState = photoStates[0],
                     onGestureDelta = createGestureHandler(0),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    showExif = showExif
                 )
             }
         }
@@ -283,14 +320,16 @@ fun CompareContent(
                     onClick = { onCardClick(0) },
                     transformState = photoStates[0],
                     onGestureDelta = createGestureHandler(0),
-                    modifier = Modifier.weight(1f).fillMaxWidth()
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    showExif = showExif
                 )
                 ZoomablePhotoContainer(
                     uri = selectedUris[1],
                     onClick = { onCardClick(1) },
                     transformState = photoStates[1],
                     onGestureDelta = createGestureHandler(1),
-                    modifier = Modifier.weight(1f).fillMaxWidth()
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    showExif = showExif
                 )
             }
         }
@@ -308,14 +347,16 @@ fun CompareContent(
                         onClick = { onCardClick(0) },
                         transformState = photoStates[0],
                         onGestureDelta = createGestureHandler(0),
-                        modifier = Modifier.weight(1f).fillMaxHeight()
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        showExif = showExif
                     )
                     ZoomablePhotoContainer(
                         uri = selectedUris[1],
                         onClick = { onCardClick(1) },
                         transformState = photoStates[1],
                         onGestureDelta = createGestureHandler(1),
-                        modifier = Modifier.weight(1f).fillMaxHeight()
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        showExif = showExif
                     )
                 }
                 Row(
@@ -327,14 +368,16 @@ fun CompareContent(
                         onClick = { onCardClick(2) },
                         transformState = photoStates[2],
                         onGestureDelta = createGestureHandler(2),
-                        modifier = Modifier.weight(1f).fillMaxHeight()
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        showExif = showExif
                     )
                     ZoomablePhotoContainer(
                         uri = selectedUris[3],
                         onClick = { onCardClick(3) },
                         transformState = photoStates[3],
                         onGestureDelta = createGestureHandler(3),
-                        modifier = Modifier.weight(1f).fillMaxHeight()
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        showExif = showExif
                     )
                 }
             }
@@ -348,6 +391,7 @@ fun ZoomablePhotoContainer(
     onClick: () -> Unit,
     transformState: PhotoTransformState,
     onGestureDelta: (Float, Float, Float) -> Unit,
+    showExif: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val currentOnGestureDelta by rememberUpdatedState(onGestureDelta)
@@ -414,7 +458,7 @@ fun ZoomablePhotoContainer(
             )
 
             // EXIF 信息层（固定在左上角，不受缩放影响）
-            if (uri != null && exifInfo != null) {
+            if (showExif && uri != null && exifInfo != null) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)

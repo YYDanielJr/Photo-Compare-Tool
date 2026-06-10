@@ -2,6 +2,7 @@
 agp = "9.2.1"
 coilCompose = "2.7.0"
 coreKtx = "1.10.1"
+datastorePreferences = "1.2.1"
 junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
@@ -12,10 +13,17 @@ composeBom = "2026.02.01"
 material3 = "1.4.0"
 room3CompilerProcessingTesting = "3.0.0-alpha06"
 exifinterface = "1.4.2"
+datastoreCore = "1.2.1"
+appcompat = "1.6.1"
+material = "1.10.0"
+activityKtx = "1.8.0"
+foundation = "1.11.2"
+ui = "1.11.2"
 
 [libraries]
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
@@ -33,6 +41,12 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 androidx-room3-compiler-processing-testing = { group = "androidx.room3", name = "room3-compiler-processing-testing", version.ref = "room3CompilerProcessingTesting" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
+androidx-datastore-core = { group = "androidx.datastore", name = "datastore-core", version.ref = "datastoreCore" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+androidx-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "ui" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

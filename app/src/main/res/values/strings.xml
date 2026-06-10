@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Photo Compare Tool</string>
+    <string name="setting_title">Settings</string>
 </resources>

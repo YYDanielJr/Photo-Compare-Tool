@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">照片比较器</string>
+    <string name="setting_title">设置</string>
 </resources>
