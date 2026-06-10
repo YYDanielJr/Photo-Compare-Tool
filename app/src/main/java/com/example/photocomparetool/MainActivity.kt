@@ -1,13 +1,16 @@
 package com.example.photocomparetool
 
+import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
@@ -24,10 +27,18 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.exifinterface.media.ExifInterface
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.size.Size
 import com.example.photocomparetool.ui.theme.PhotoCompareToolTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,9 +59,7 @@ enum class CompareMode(val icon: ImageVector, val label: String) {
     FOUR(Icons.Filled.GridView, "四张")
 }
 
-/**
- * 照片的缩放/平移状态，每张照片独立拥有
- */
+// 照片缩放/平移状态
 class PhotoTransformState(
     initialScale: Float = 1f,
     initialOffsetX: Float = 0f,
@@ -61,6 +70,79 @@ class PhotoTransformState(
     var offsetY by mutableFloatStateOf(initialOffsetY)
 }
 
+// EXIF 显示信息
+data class ExifDisplayInfo(
+    val fileName: String = "未知",
+    val device: String = "未知",
+    val aperture: String = "未知",
+    val shutter: String = "未知",
+    val iso: String = "未知",
+    val focalLength: String = "未知",
+    val focalLength35mm: String? = null
+)
+
+/**
+ * 从 Uri 读取 EXIF 信息（在 IO 线程调用）
+ */
+suspend fun readExifInfo(context: Context, uri: Uri): ExifDisplayInfo = withContext(Dispatchers.IO) {
+    try {
+        // 统一使用 InputStream 构造 ExifInterface，兼容所有 Android 版本
+        val inputStream = context.contentResolver.openInputStream(uri)
+        val exif = inputStream?.use { ExifInterface(it) } ?: return@withContext ExifDisplayInfo()
+
+        // 文件名
+        val fileName: String = run {
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) it.getString(nameIndex) else "未知"
+                } else "未知"
+            } ?: uri.lastPathSegment ?: "未知"
+        }
+
+        // 设备型号
+        val make = exif.getAttribute(ExifInterface.TAG_MAKE) ?: ""
+        val model = exif.getAttribute(ExifInterface.TAG_MODEL) ?: ""
+        val device = if (make.isNotBlank() && model.isNotBlank()) "$make $model"
+        else if (model.isNotBlank()) model
+        else if (make.isNotBlank()) make
+        else "未知"
+
+        // 光圈
+        val apertureValue = exif.getAttributeDouble(ExifInterface.TAG_F_NUMBER, -1.0)
+        val aperture = if (apertureValue > 0) "f/${String.format("%.1f", apertureValue)}" else "未知"
+
+        // 快门
+        val exposureTime = exif.getAttributeDouble(ExifInterface.TAG_EXPOSURE_TIME, -1.0)
+        val shutter = if (exposureTime > 0) {
+            if (exposureTime < 0.5) "1/${(1.0 / exposureTime).toInt()}s"
+            else "${String.format("%.1f", exposureTime)}s"
+        } else "未知"
+
+        // ISO
+        val iso = exif.getAttribute(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY)
+            ?: exif.getAttribute(ExifInterface.TAG_ISO_SPEED_RATINGS)
+            ?: "未知"
+
+        // 原始焦段
+        val focalLengthValue = exif.getAttributeDouble(ExifInterface.TAG_FOCAL_LENGTH, -1.0)
+        val focalLength = if (focalLengthValue > 0) "${String.format("%.1f", focalLengthValue)}mm" else "未知"
+
+        // 35mm 等效焦段（可能不存在）
+        val focalLength35mmValue = exif.getAttributeInt(ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM, -1)
+        val focalLength35mm = if (focalLength35mmValue > 0) "${focalLength35mmValue}mm" else null
+
+        ExifDisplayInfo(
+            fileName, device, aperture, shutter, iso,
+            focalLength, focalLength35mm
+        )
+    } catch (e: Exception) {
+        e.printStackTrace()
+        ExifDisplayInfo()
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
@@ -68,22 +150,12 @@ fun HomeScreen() {
     var menuExpanded by remember { mutableStateOf(false) }
     var isLocked by remember { mutableStateOf(false) }
 
-    // 存储各位置选中的图片 Uri
-    var selectedUris by remember {
-        mutableStateOf(List<Uri?>(4) { null })
-    }
-
-    // 每张照片的独立变换状态（最多4个）
+    var selectedUris by remember { mutableStateOf(List<Uri?>(4) { null }) }
     val photoStates = remember { mutableStateListOf<PhotoTransformState>() }
-    // 初始化4个状态对象（按需使用）
-    if (photoStates.isEmpty()) {
-        repeat(4) { photoStates.add(PhotoTransformState()) }
-    }
+    if (photoStates.isEmpty()) repeat(4) { photoStates.add(PhotoTransformState()) }
 
-    // 记录当前点击的是第几个容器（0~3）
     var currentPickerIndex by remember { mutableIntStateOf(0) }
 
-    // 图库选择器
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
@@ -97,23 +169,16 @@ fun HomeScreen() {
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
-                    // 锁定/解锁按钮
                     IconButton(onClick = { isLocked = !isLocked }) {
                         Icon(
                             imageVector = if (isLocked) Icons.Filled.Lock else Icons.Filled.LockOpen,
                             contentDescription = if (isLocked) "解锁" else "锁定"
                         )
                     }
-
                     Spacer(modifier = Modifier.width(4.dp))
-
-                    // 比对模式下拉菜单
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {
-                            Icon(
-                                imageVector = selectedMode.icon,
-                                contentDescription = "切换比对模式"
-                            )
+                            Icon(selectedMode.icon, contentDescription = "切换比对模式")
                         }
                         DropdownMenu(
                             expanded = menuExpanded,
@@ -125,7 +190,6 @@ fun HomeScreen() {
                                     onClick = {
                                         selectedMode = mode
                                         menuExpanded = false
-                                        // 重置所有状态和图片
                                         selectedUris = List(4) { null }
                                         photoStates.forEach { state ->
                                             state.scale = 1f
@@ -133,13 +197,11 @@ fun HomeScreen() {
                                             state.offsetY = 0f
                                         }
                                     },
-                                    leadingIcon = {
-                                        Icon(imageVector = mode.icon, contentDescription = null)
-                                    },
+                                    leadingIcon = { Icon(mode.icon, null) },
                                     trailingIcon = {
                                         if (mode == selectedMode) {
                                             Icon(
-                                                imageVector = Icons.Filled.Check,
+                                                Icons.Filled.Check,
                                                 contentDescription = "已选中",
                                                 tint = MaterialTheme.colorScheme.primary
                                             )
@@ -149,15 +211,9 @@ fun HomeScreen() {
                             }
                         }
                     }
-
                     Spacer(modifier = Modifier.width(4.dp))
-
-                    // 设置按钮
-                    IconButton(onClick = { /* 打开设置 */ }) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = "设置"
-                        )
+                    IconButton(onClick = { /* 设置 */ }) {
+                        Icon(Icons.Filled.Settings, contentDescription = "设置")
                     }
                 }
             )
@@ -171,9 +227,7 @@ fun HomeScreen() {
             onCardClick = { index ->
                 currentPickerIndex = index
                 imagePicker.launch(
-                    PickVisualMediaRequest(
-                        ActivityResultContracts.PickVisualMedia.ImageOnly
-                    )
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                 )
             },
             modifier = Modifier.padding(innerPadding)
@@ -190,20 +244,17 @@ fun CompareContent(
     onCardClick: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 创建手势增量回调，根据锁定状态决定更新范围
     val createGestureHandler: (Int) -> (Float, Float, Float) -> Unit = { index ->
         { zoomDelta, panX, panY ->
             if (isLocked) {
-                // 锁定模式：对所有照片状态应用相同增量
                 photoStates.forEach { state ->
-                    state.scale = (state.scale * zoomDelta).coerceIn(1f, 3f)
+                    state.scale = (state.scale * zoomDelta).coerceIn(1f, 10f) // 改变缩放比例
                     state.offsetX += panX
                     state.offsetY += panY
                 }
             } else {
-                // 解锁模式：仅更新当前照片
                 val state = photoStates[index]
-                state.scale = (state.scale * zoomDelta).coerceIn(1f, 3f)
+                state.scale = (state.scale * zoomDelta).coerceIn(1f, 10f) // 改变缩放比例
                 state.offsetX += panX
                 state.offsetY += panY
             }
@@ -222,7 +273,6 @@ fun CompareContent(
                 )
             }
         }
-
         CompareMode.TWO -> {
             Column(
                 modifier = modifier.fillMaxSize().padding(16.dp),
@@ -244,7 +294,6 @@ fun CompareContent(
                 )
             }
         }
-
         CompareMode.FOUR -> {
             Column(
                 modifier = modifier.fillMaxSize().padding(16.dp),
@@ -293,9 +342,6 @@ fun CompareContent(
     }
 }
 
-/**
- * 可双指缩放/平移的照片容器（状态由外部传入，完全无内部状态）
- */
 @Composable
 fun ZoomablePhotoContainer(
     uri: Uri?,
@@ -304,9 +350,15 @@ fun ZoomablePhotoContainer(
     onGestureDelta: (Float, Float, Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 核心修复：使用 rememberUpdatedState 保证在 pointerInput 内部始终调用最新的 lambda
     val currentOnGestureDelta by rememberUpdatedState(onGestureDelta)
     val currentOnClick by rememberUpdatedState(onClick)
+
+    // 读取 EXIF 信息（异步）
+    val context = LocalContext.current
+    var exifInfo by remember { mutableStateOf<ExifDisplayInfo?>(null) }
+    LaunchedEffect(uri) {
+        exifInfo = if (uri != null) readExifInfo(context, uri) else null
+    }
 
     Card(
         modifier = modifier,
@@ -319,15 +371,14 @@ fun ZoomablePhotoContainer(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(RoundedCornerShape(8.dp))
-                // 使用最新的点击回调
                 .clickable { currentOnClick() }
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, _ ->
-                        // 无论外部 isLocked 怎么变，这里始终会执行携带最新状态的回调
                         currentOnGestureDelta(zoom, pan.x, pan.y)
                     }
                 }
         ) {
+            // 图片层（可缩放/平移）
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -340,14 +391,58 @@ fun ZoomablePhotoContainer(
                 contentAlignment = Alignment.Center
             ) {
                 if (uri != null) {
+                    val context = LocalContext.current
                     AsyncImage(
-                        model = uri,
+                        model = ImageRequest.Builder(context)
+                            .data(uri)
+                            .size(Size.ORIGINAL)   // 强制加载原始分辨率
+                            .build(),
                         contentDescription = "选中的照片",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
                     )
                 } else {
                     Text("点击选择", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            val exifTextStyle = MaterialTheme.typography.bodySmall.copy(
+                fontSize = 12.sp,
+                lineHeight = 14.sp,      // 减小行高，可根据需要调整
+                color = Color.White,
+                fontWeight = FontWeight.Medium
+            )
+
+            // EXIF 信息层（固定在左上角，不受缩放影响）
+            if (uri != null && exifInfo != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp)
+                        .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Column {
+                        Text(
+                            text = exifInfo!!.fileName,
+                            style = exifTextStyle
+                        )
+                        Text(
+                            text = exifInfo!!.device,
+                            style = exifTextStyle
+                        )
+                        Text(
+                            text = "${exifInfo!!.aperture} | ${exifInfo!!.shutter} | ISO ${exifInfo!!.iso}",
+                            style = exifTextStyle
+                        )
+                        Text(
+                            text = buildString {
+                                append(exifInfo!!.focalLength)
+                                exifInfo!!.focalLength35mm?.let { append(" (35mm等效: $it)") }
+                            },
+                            style = exifTextStyle
+                        )
+                    }
                 }
             }
         }

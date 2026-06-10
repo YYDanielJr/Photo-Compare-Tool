@@ -11,6 +11,7 @@ kotlin = "2.2.10"
 composeBom = "2026.02.01"
 material3 = "1.4.0"
 room3CompilerProcessingTesting = "3.0.0-alpha06"
+exifinterface = "1.4.2"
 
 [libraries]
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
@@ -31,6 +32,7 @@ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-te
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 androidx-room3-compiler-processing-testing = { group = "androidx.room3", name = "room3-compiler-processing-testing", version.ref = "room3CompilerProcessingTesting" }
+androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
